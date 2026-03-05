@@ -69,6 +69,7 @@ regex==2026.2.28
 requests==2.32.5
 -e git+https://github.com/ARISE-Initiative/robomimic.git@e10526b9a40c78b41f1e37e60041dc0ec0a5f60f#egg=robomimic
 -e git+https://github.com/ARISE-Initiative/robosuite.git@6c10ef24a4bb52f59199976125060ce793470e6e#egg=robosuite
+robosuite_models==1.0.0
 safetensors==0.7.0
 scipy==1.17.1
 setuptools==82.0.0

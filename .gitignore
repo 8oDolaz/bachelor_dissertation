@@ -1,6 +1,21 @@
 .venv
+.vscode
+.claude
 __pycache__
 tmp
+
+latex
+*.gz
+*.toc
+*.aux
+*.bbl
+*.bak
+*.blg
+*.log
+*.bcf
+*.out
+*.run.xml
+latexmkrc
 
 robomimic
 robosuite

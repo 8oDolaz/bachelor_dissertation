@@ -10,6 +10,7 @@ Usage:
     python test_bc_rnn.py --debug
 """
 import argparse
+import os
 
 import robomimic
 import robomimic.utils.torch_utils as TorchUtils
@@ -95,7 +96,7 @@ def set_hyperparameters(config):
 
     ## Evaluation rollouts ##
     config.experiment.rollout.enabled = True
-    config.experiment.rollout.n = 50
+    config.experiment.rollout.n = 10
     config.experiment.rollout.horizon = 400
     config.experiment.rollout.rate = 50
     config.experiment.rollout.warmstart = 0
@@ -119,8 +120,8 @@ def set_hyperparameters(config):
     config.train.goal_mode = None
 
     ## Learning ##
-    config.train.cuda = False
-    config.train.batch_size = 16                        # smaller batch for image training
+    config.train.cuda = True
+    config.train.batch_size = 32                        # smaller batch for image training
     config.train.num_epochs = 50                        # 50 training epochs
     config.train.seed = 1
 
@@ -215,7 +216,7 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
         dataset_path = TestUtils.example_dataset_path()
 
     if output_dir is None:
-        output_dir = TestUtils.temp_model_dir_path()
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "train_runs")
 
     config = config_factory(algo_name="bc")
 
@@ -273,7 +274,7 @@ if __name__ == "__main__":
 
     config = get_config(
         dataset_path=args.dataset,
-        output_dir=args.output,
+        output_dir=os.path.abspath(args.output) if args.output is not None else None,
         debug=args.debug,
     )
 

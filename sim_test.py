@@ -24,6 +24,9 @@ obs, reward, done, info = env.step(action)  # take action in the environment
 print(list(obs.keys()), end='\n\n')
 env.render()  # render on display
 
-print(done, end='\n\n')
-
-env.close()
+while True:
+    try:
+        pass
+    except KeyboardInterrupt:
+        env.close()
+        break

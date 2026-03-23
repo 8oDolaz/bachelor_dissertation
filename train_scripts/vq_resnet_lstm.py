@@ -20,6 +20,11 @@ Usage:
     python test_vq_bc_rnn.py --debug
 """
 import argparse
+import sys
+import os
+
+# Add parent directory to path so we can import models module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import robomimic
 import robomimic.utils.torch_utils as TorchUtils
@@ -32,7 +37,7 @@ import robomimic.scripts.train as _train_module
 
 # Import VQ components - this triggers VisualCoreVQ registration
 # via EncoderCore.__init_subclass__
-from vq import VisualCoreVQ, BC_RNN_GMM_VQ
+from models.vq import VisualCoreVQ, BC_RNN_GMM_VQ
 
 
 def freeze_backbone_except_last(model):
@@ -153,8 +158,8 @@ def set_hyperparameters(config):
     config.train.goal_mode = None
 
     ## Learning ##
-    config.train.cuda = False
-    config.train.batch_size = 16
+    config.train.cuda = True
+    config.train.batch_size = 32
     config.train.num_epochs = 50
     config.train.seed = 1
 
@@ -254,7 +259,7 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
         dataset_path = TestUtils.example_dataset_path()
 
     if output_dir is None:
-        output_dir = TestUtils.temp_model_dir_path()
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "train_runs")
 
     config = config_factory(algo_name="bc")
 
@@ -312,7 +317,7 @@ if __name__ == "__main__":
 
     config = get_config(
         dataset_path=args.dataset,
-        output_dir=args.output,
+        output_dir=os.path.abspath(args.output) if args.output is not None else None,
         debug=args.debug,
     )
 

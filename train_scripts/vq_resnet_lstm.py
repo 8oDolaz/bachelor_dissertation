@@ -27,9 +27,12 @@ import faulthandler
 # Add parent directory to path so we can import models module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import gc
+
 import robomimic
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.test_utils as TestUtils
+import robomimic.utils.train_utils as TrainUtils
 import robomimic.macros as Macros
 from robomimic.config import config_factory
 from robomimic.algo import algo_factory as _original_algo_factory
@@ -100,6 +103,20 @@ def _algo_factory_with_vq(algo_name, config, obs_key_shapes, ac_dim, device):
 
 # Patch algo_factory in the train module
 _train_module.algo_factory = _algo_factory_with_vq
+
+# Patch save_model to force GC before each save.
+# During state_dict() the larger VQ buffers (_ema_cluster_size, _ema_w) push
+# memory allocations past Python's GC threshold, causing the collector to run
+# mid-save and invoke robosuite EGL context destructors on the wrong thread,
+# which segfaults. Collecting explicitly beforehand drains those pending
+# destructors while nothing critical is happening.
+_original_save_model = TrainUtils.save_model
+
+def _save_model_gc(*args, **kwargs):
+    gc.collect()
+    return _original_save_model(*args, **kwargs)
+
+TrainUtils.save_model = _save_model_gc
 
 
 def set_hyperparameters(config):

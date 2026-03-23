@@ -74,7 +74,7 @@ def set_hyperparameters(config):
     ## Save config ##
     config.experiment.save.enabled = True
     config.experiment.save.every_n_seconds = None
-    config.experiment.save.every_n_epochs = 10
+    config.experiment.save.every_n_epochs = 15
     config.experiment.save.epochs = []
     config.experiment.save.on_best_validation = False
     config.experiment.save.on_best_rollout_return = False
@@ -221,7 +221,7 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
     config = config_factory(algo_name="bc")
 
     ### Experiment Config ###
-    config.experiment.name = "bc_rnn_image"
+    config.experiment.name = f"resnet_lstm_{config.train.num_epochs}"
     config.experiment.validate = True
     config.experiment.logging.terminal_output_to_txt = False
     config.experiment.logging.log_tb = True

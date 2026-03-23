@@ -22,6 +22,7 @@ Usage:
 import argparse
 import sys
 import os
+import faulthandler
 
 # Add parent directory to path so we can import models module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -134,7 +135,7 @@ def set_hyperparameters(config):
 
     ## Evaluation rollouts ##
     config.experiment.rollout.enabled = True
-    config.experiment.rollout.n = 50
+    config.experiment.rollout.n = 10
     config.experiment.rollout.horizon = 400
     config.experiment.rollout.rate = 50
     config.experiment.rollout.warmstart = 0
@@ -288,6 +289,16 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
 
 
 if __name__ == "__main__":
+    import torch.multiprocessing
+    torch.multiprocessing.set_start_method("fork", force=True)
+
+    # Enable faulthandler in the main process and all spawned worker processes.
+    # On any SIGSEGV/SIGFPE/SIGABRT this dumps a C-level stack trace to stderr,
+    # which ends up in log.txt once robomimic redirects stderr there.
+    # PYTHONFAULTHANDLER is read by Python on startup, so it covers worker processes too.
+    os.environ["PYTHONFAULTHANDLER"] = "1"
+    faulthandler.enable()
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

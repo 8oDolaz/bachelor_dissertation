@@ -178,8 +178,10 @@ def set_hyperparameters(config):
     ## Learning ##
     config.train.cuda = True
     config.train.batch_size = 32
-    config.train.num_epochs = 50
+    config.train.num_epochs = 100
     config.train.seed = 1
+    config.train.max_grad_norm = 10.0                    # gradient clipping
+
 
     ### Observation Config ###
 

@@ -10,11 +10,13 @@ Usage:
     python test_bc_rnn.py --debug
 """
 import argparse
+import gc
 import os
 
 import robomimic
 import robomimic.utils.torch_utils as TorchUtils
 import robomimic.utils.test_utils as TestUtils
+import robomimic.utils.train_utils as TrainUtils
 import robomimic.macros as Macros
 from robomimic.config import config_factory
 from robomimic.algo import algo_factory as _original_algo_factory
@@ -61,6 +63,18 @@ def _algo_factory_with_freeze(*args, **kwargs):
 
 # Patch algo_factory in the train module so frozen backbone is used
 _train_module.algo_factory = _algo_factory_with_freeze
+
+# Patch save_model to force GC before each save.
+# During state_dict() Python's GC may trigger and invoke robosuite EGL context
+# destructors on the wrong thread, which segfaults. Collecting explicitly
+# beforehand drains those pending destructors while nothing critical is happening.
+_original_save_model = TrainUtils.save_model
+
+def _save_model_gc(*args, **kwargs):
+    gc.collect()
+    return _original_save_model(*args, **kwargs)
+
+TrainUtils.save_model = _save_model_gc
 
 
 def set_hyperparameters(config):
@@ -122,8 +136,9 @@ def set_hyperparameters(config):
     ## Learning ##
     config.train.cuda = True
     config.train.batch_size = 32                        # smaller batch for image training
-    config.train.num_epochs = 50                        # 50 training epochs
+    config.train.num_epochs = 100                       # 50 training epochs
     config.train.seed = 1
+    config.train.max_grad_norm = 10.0                    # gradient clipping
 
     ### Observation Config ###
 

@@ -40,8 +40,9 @@ from robomimic.algo import RolloutPolicy
 from config import SceneConfig
 from factory import PRESETS, create_env
 
-# Import VQ components so they are registered
+# Import custom components so they are registered in robomimic's backbone registry
 from models.vq import VisualCoreVQ, BC_RNN_GMM_VQ
+from models.dinov2 import DINOv2Conv
 
 
 def _load_policy(ckpt_path, device):

@@ -296,6 +296,13 @@ class ModifiedLiftEnv:
         noise[2] = abs(noise[2])  # keep z positive (don't push through table)
         self.env.sim.data.body_xpos[cube_body_id] += noise
 
+    @staticmethod
+    def _remap_obs(obs):
+        """Remap robosuite obs keys to match robomimic training conventions."""
+        if "object-state" in obs and "object" not in obs:
+            obs["object"] = obs["object-state"]
+        return obs
+
     # ------------------------------------------------------------------
     # Public API (mirrors robosuite env interface)
     # ------------------------------------------------------------------
@@ -318,14 +325,15 @@ class ModifiedLiftEnv:
         self._step_counter = 0
         # Re-render observations with modified visual state
         obs = self.env._get_observations()
-        return obs
+        return self._remap_obs(obs)
 
     def step(self, action):
         self._step_counter += 1
         if (self.config.randomize_every_n_steps > 0
                 and self._step_counter % self.config.randomize_every_n_steps == 0):
             self._apply_randomization()
-        return self.env.step(action)
+        obs, reward, done, info = self.env.step(action)
+        return self._remap_obs(obs), reward, done, info
 
     def render(self):
         """Render the MuJoCo viewer and show camera feeds in an OpenCV window."""

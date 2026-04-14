@@ -134,7 +134,6 @@ def set_hyperparameters(config):
     # Backbone: DINOv2 ViT-B/14
     config.observation.encoder.rgb.core_kwargs.backbone_class = "DINOv2Conv"
     config.observation.encoder.rgb.core_kwargs.backbone_kwargs.pretrained = True
-    config.observation.encoder.rgb.core_kwargs.backbone_kwargs.freeze_until_block = 10
 
     # Pooling: SpatialSoftmax on the [768, 16, 16] patch feature map
     config.observation.encoder.rgb.core_kwargs.pool_class = "SpatialSoftmax"

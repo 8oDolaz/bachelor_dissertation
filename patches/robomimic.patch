@@ -1,0 +1,83 @@
+diff --git a/robomimic/algo/bc.py b/robomimic/algo/bc.py
+index b824b32..cbb0571 100644
+--- a/robomimic/algo/bc.py
++++ b/robomimic/algo/bc.py
+@@ -1,7 +1,7 @@
+ """
+ Implementation of Behavioral Cloning (BC).
+ """
+-from collections import OrderedDict
++from collections import OrderedDict, deque
+ 
+ import torch
+ import torch.nn as nn
+@@ -705,6 +705,11 @@ class BC_Transformer(BC):
+         self.pred_future_acs = self.algo_config.transformer.pred_future_acs
+         if self.pred_future_acs:
+             assert self.supervise_all_steps is True
++        self._obs_history = None  # initialized on reset()
++
++    def reset(self):
++        """Reset obs history buffer at the start of each episode."""
++        self._obs_history = deque(maxlen=self.context_length)
+ 
+     def process_batch_for_training(self, batch):
+         """
+@@ -777,7 +782,22 @@ class BC_Transformer(BC):
+         """
+         assert not self.nets.training
+ 
+-        output = self.nets["policy"](obs_dict, actions=None, goal_dict=goal_dict)
++        # Maintain a rolling obs history so the transformer always receives
++        # a full (B, T, D) context window, padding with the first obs when
++        # the episode has fewer than context_length steps so far.
++        if self._obs_history is None:
++            self._obs_history = deque(maxlen=self.context_length)
++        self._obs_history.append(obs_dict)
++
++        # Pad to context_length by repeating the earliest entry
++        history = list(self._obs_history)
++        while len(history) < self.context_length:
++            history.insert(0, history[0])
++
++        # Stack along time dimension → (B, T, D) per key
++        seq_obs = {k: torch.stack([h[k] for h in history], dim=1) for k in obs_dict}
++
++        output = self.nets["policy"](seq_obs, actions=None, goal_dict=goal_dict)
+ 
+         if self.supervise_all_steps:
+             if self.algo_config.transformer.pred_future_acs:
+@@ -789,7 +809,6 @@ class BC_Transformer(BC):
+ 
+         return output
+ 
+-        
+ 
+ class BC_Transformer_GMM(BC_Transformer):
+     """
+diff --git a/robomimic/models/obs_core.py b/robomimic/models/obs_core.py
+index 1ac8b62..f05fb1d 100644
+--- a/robomimic/models/obs_core.py
++++ b/robomimic/models/obs_core.py
+@@ -103,7 +103,7 @@ class VisualCore(EncoderCore, BaseNets.ConvBase):
+ 
+         # visual backbone
+         assert isinstance(backbone_class, str)
+-        self.backbone = eval(backbone_class)(**backbone_kwargs)
++        self.backbone = ObsUtils.OBS_ENCODER_BACKBONES[backbone_class](**backbone_kwargs)
+ 
+         assert isinstance(self.backbone, BaseNets.ConvBase)
+ 
+diff --git a/robomimic/scripts/train.py b/robomimic/scripts/train.py
+index c0c97b5..b540c11 100644
+--- a/robomimic/scripts/train.py
++++ b/robomimic/scripts/train.py
+@@ -423,7 +423,7 @@ def train(config, device, resume=False):
+         )
+ 
+         # Save model checkpoints based on conditions (success rate, validation loss, etc)
+-        if should_save_ckpt:    
++        if should_save_ckpt:
+             TrainUtils.save_model(
+                 model=model,
+                 config=config,

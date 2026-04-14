@@ -1,0 +1,27 @@
+services:
+  train:
+    build: .
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+      - MUJOCO_GL=egl
+    volumes:
+      # Mount your code so edits are live (no rebuild needed)
+      - ./train_scripts:/workspace/train_scripts
+      - ./utils:/workspace/utils
+      # Mount dataset so it's not baked into the image
+      - ./dataset:/workspace/dataset
+      # Persist training outputs
+      - ./train_runs:/workspace/train_runs
+      - ./models:/workspace/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: '8g'        # PyTorch DataLoader needs shared memory
+    stdin_open: true       # docker compose run -it
+    tty: true

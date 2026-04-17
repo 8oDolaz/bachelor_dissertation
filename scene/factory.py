@@ -416,7 +416,7 @@ PRESETS = {
         ),
     ),
     "color_jitter_table_n_cube": SceneConfig(
-        name="color_jitter_table",
+        name="color_jitter_table_n_cube",
         texture=TextureConfig(
             enabled=True,
             randomize_local=False,   # fully random color

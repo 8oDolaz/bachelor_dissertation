@@ -7,7 +7,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
       - MUJOCO_GL=egl
     volumes:
-      - ./:workspace
+      - ./:/workspace
     deploy:
       resources:
         reservations:

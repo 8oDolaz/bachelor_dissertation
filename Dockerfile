@@ -5,15 +5,16 @@ ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake git curl wget \
-        python3.12 python3.12-dev python3.12-venv python3-pip \
+        python3.10 python3.10-dev python3.10-venv python3-pip \
         libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
         libglfw3-dev libglew-dev libosmesa6-dev \
         libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 \
+        libglib2.0-0 \
         patchelf \
     && rm -rf /var/lib/apt/lists/*
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
-    update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
+    update-alternatives --install /usr/bin/python  python  /usr/bin/python3.10 1
 
 ENV MUJOCO_GL=egl
 ENV PYOPENGL_PLATFORM=egl
@@ -21,10 +22,11 @@ ENV PYOPENGL_PLATFORM=egl
 WORKDIR /workspace
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip setuptools wheel && \
+    pip install \
         torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu128 && \
-    pip install --no-cache-dir -r requirements.txt \
+    pip install -r requirements.txt \
         --extra-index-url https://download.pytorch.org/whl/cu128
 
 RUN mkdir -p /opt/src && \
@@ -38,7 +40,8 @@ RUN cd /opt/src/robomimic && git apply /tmp/patches/robomimic.patch && \
     cd /opt/src/robosuite && git apply /tmp/patches/robosuite.patch && \
     rm -rf /tmp/patches
 
-RUN pip install --no-cache-dir -e /opt/src/robomimic -e /opt/src/robosuite
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -e /opt/src/robomimic -e /opt/src/robosuite
 
 COPY . /workspace
 

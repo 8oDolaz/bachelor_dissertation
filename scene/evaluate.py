@@ -43,6 +43,11 @@ from factory import PRESETS, create_env
 # Import custom components so they are registered in robomimic's backbone registry
 from models.vq import VisualCoreVQ, BC_RNN_GMM_VQ
 from models.dinov2 import DINOv2Conv
+from models.vqvae import (
+    DINOv2ConvLastTrainable,  # noqa: F401 (import triggers registration)
+    VisualCoreVQVAE,
+    BC_Transformer_GMM_VQVAE,
+)
 
 
 def _load_policy(ckpt_path, device):
@@ -73,16 +78,25 @@ def _load_policy(ckpt_path, device):
             for k in action_normalization_stats[m]:
                 action_normalization_stats[m][k] = np.array(action_normalization_stats[m][k])
 
-    # Determine if this is a VQ model by checking encoder config
-    is_vq = False
+    # Determine custom algo class from encoder config (standard robomimic's
+    # algo_factory does not know about our BC_RNN_GMM_VQ / BC_Transformer_GMM_VQVAE).
+    core_class = None
     try:
         core_class = config.observation.encoder.rgb.core_class
-        is_vq = (core_class == "VisualCoreVQ")
     except AttributeError:
         pass
 
-    if is_vq:
+    if core_class == "VisualCoreVQ":
         model = BC_RNN_GMM_VQ(
+            algo_config=config.algo,
+            obs_config=config.observation,
+            global_config=config,
+            obs_key_shapes=shape_meta["all_shapes"],
+            ac_dim=shape_meta["ac_dim"],
+            device=device,
+        )
+    elif core_class == "VisualCoreVQVAE":
+        model = BC_Transformer_GMM_VQVAE(
             algo_config=config.algo,
             obs_config=config.observation,
             global_config=config,

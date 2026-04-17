@@ -398,6 +398,25 @@ PRESETS = {
         ),
         placement=PlacementConfig(enabled=True),
     ),
+    "color_jitter_table": SceneConfig(
+        name="color_jitter_table",
+        texture=TextureConfig(
+            enabled=True,
+            randomize_local=False,   # fully random color
+            texture_variations=("rgb",),
+            geom_names=["table_visual"],
+        ),
+    ),
+    "color_jitter_table_n_cube": SceneConfig(
+        name="color_jitter_table",
+        texture=TextureConfig(
+            enabled=True,
+            randomize_local=False,   # fully random color
+            local_rgb_interpolation=1.0,
+            texture_variations=("rgb",),
+            geom_names=["table_visual", "cube_g0_vis"],
+        ),
+    ),
     "lighting_change": SceneConfig(
         name="lighting_change",
         lighting=LightingConfig(
@@ -447,7 +466,7 @@ PRESETS = {
             diffuse_perturbation_size=0.15,
         ),
         camera=CameraConfig(
-            enabled=True,
+            enabled=False,
             position_perturbation_size=0.02,
             rotation_perturbation_size=0.05,
         ),

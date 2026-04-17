@@ -6,8 +6,12 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
       - MUJOCO_GL=egl
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/tmp/.Xauthority
     volumes:
       - ./:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY:-~/.Xauthority}:/tmp/.Xauthority:ro
     deploy:
       resources:
         reservations:
@@ -15,6 +19,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    ports:
+      - "6007:6007"
     shm_size: '8g'
     stdin_open: true
     tty: true

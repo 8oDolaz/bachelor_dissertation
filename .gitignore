@@ -15,6 +15,9 @@ latex
 *.bcf
 *.out
 *.run.xml
+*.fls
+*.xdv
+*fdb_latexmk
 latexmkrc
 
 robomimic

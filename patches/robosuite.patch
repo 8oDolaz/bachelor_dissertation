@@ -1,0 +1,35 @@
+diff --git a/robosuite/renderers/context/egl_context.py b/robosuite/renderers/context/egl_context.py
+index 72c187f..2a476a2 100644
+--- a/robosuite/renderers/context/egl_context.py
++++ b/robosuite/renderers/context/egl_context.py
+@@ -147,8 +147,13 @@ class EGLGLContext:
+             current_context = EGL.eglGetCurrentContext()
+             if current_context and self._context.address == current_context.address:
+                 EGL.eglMakeCurrent(EGL_DISPLAY, EGL.EGL_NO_SURFACE, EGL.EGL_NO_SURFACE, EGL.EGL_NO_CONTEXT)
++                # Only release thread state when we actually unbound the
++                # current context.  Calling eglReleaseThread() unconditionally
++                # would nuke whatever OTHER context is currently active on
++                # this thread — a classic cause of intermittent framebuffer
++                # corruption when Python's GC collects a stale context.
++                EGL.eglReleaseThread()
+             EGL.eglDestroyContext(EGL_DISPLAY, self._context)
+-            EGL.eglReleaseThread()
+         self._context = None
+ 
+     def __del__(self):
+diff --git a/robosuite/utils/binding_utils.py b/robosuite/utils/binding_utils.py
+index e69aced..7b8fddd 100644
+--- a/robosuite/utils/binding_utils.py
++++ b/robosuite/utils/binding_utils.py
+@@ -1137,6 +1137,11 @@ class MjSim:
+         assert mode == "offscreen", "only offscreen supported for now"
+         assert self._render_context_offscreen is not None
+         with _MjSim_render_lock:
++            # Ensure the EGL context is current before touching the GPU.
++            # It can silently become not-current if a stale render context
++            # is garbage-collected (eglReleaseThread side-effect) or if
++            # any other code path disturbs the EGL state.
++            self._render_context_offscreen.gl_ctx.make_current()
+             self._render_context_offscreen.render(
+                 width=width, height=height, camera_id=camera_id, segmentation=segmentation
+             )

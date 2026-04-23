@@ -1,0 +1,51 @@
+# Example sweep config for utils/collect_stats.py
+#
+# Usage:
+#   python utils/collect_stats.py --config utils/stats_config_example.yaml --dry_run
+#   python utils/collect_stats.py --config utils/stats_config_example.yaml
+#
+# Defaults are merged into every job; per-job keys override them.
+# Each job expands into N runs via either:
+#   - `seeds: [a, b, c]`  (explicit list)
+#   - `repeats: N`         (seeds = [seed, seed+1, ..., seed+N-1])
+#   - neither              (single run with default seed)
+
+defaults:
+  horizon: 400
+  seed: 42
+  selection_seed: 42
+  n: 20
+  random: false
+  timeout_sec: 3600   # per-job wall-clock timeout
+  retries: 1          # re-run a job once on failure / timeout
+
+jobs:
+  # - agent: train_runs/dino_transformer_2000/20260414164632/last.pth
+  #   dataset: scene/custom/default
+  #   n: null
+  #   repeats: 10
+
+  # - agent: train_runs/dino_transformer_2000/20260414164632/last.pth
+  #   dataset: scene/custom/color_jitter_full
+  #   n: null
+  #   repeats: 10
+
+  - agent: train_runs/dino_transformer_2000/20260414164632/last.pth
+    dataset: scene/custom/color_jitter_table_n_cube
+    n: null
+    repeats: 10
+
+  # - agent: train_runs/dino_vqvae_transformer_2000/20260417120413/last.pth
+  #   dataset: scene/custom/default
+  #   n: null
+  #   repeats: 10
+
+  # - agent: train_runs/dino_vqvae_transformer_2000/20260417120413/last.pth
+  #   dataset: scene/custom/color_jitter_full
+  #   n: null
+  #   repeats: 10
+
+  - agent: train_runs/dino_vqvae_transformer_2000/20260417120413/last.pth
+    dataset: scene/custom/color_jitter_table_n_cube
+    n: null
+    repeats: 10

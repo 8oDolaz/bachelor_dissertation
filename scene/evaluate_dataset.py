@@ -23,11 +23,14 @@ Usage:
     python scene/evaluate_dataset.py --agent path/to/model.pth --dataset scene/datasets/default_50 --video_path scene/videos/eval.mp4
 """
 import argparse
+import csv
 import dataclasses
+import datetime
 import json
 import os
 import pickle
 import sys
+import uuid
 from copy import deepcopy
 
 import numpy as np
@@ -126,6 +129,40 @@ def _select_episodes(n_total, args):
     else:
         indices = list(range(n_total))
     return indices
+
+
+_RUNS_CSV_COLUMNS = [
+    "run_id", "timestamp", "agent", "dataset", "scene_name",
+    "arg_n", "arg_range", "arg_random", "selection_seed", "seed",
+    "horizon", "n_total", "n_evaluated",
+    "indices", "successes",
+    "num_success", "num_crashed", "success_rate",
+    "avg_return", "avg_horizon",
+]
+
+_EPISODES_CSV_COLUMNS = [
+    "run_id", "episode_idx", "success", "crashed", "return", "horizon",
+]
+
+
+def _append_csv(path, columns, rows):
+    """Append rows to CSV, creating header if file doesn't exist."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    write_header = not os.path.exists(path) or os.path.getsize(path) == 0
+    with open(path, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=columns)
+        if write_header:
+            writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in columns})
+
+
+def write_stats(stats_dir, run_record, episode_records):
+    """Append one run summary row and per-episode rows to the stats CSVs."""
+    runs_path = os.path.join(stats_dir, "stats_runs.csv")
+    episodes_path = os.path.join(stats_dir, "stats_episodes.csv")
+    _append_csv(runs_path, _RUNS_CSV_COLUMNS, [run_record])
+    _append_csv(episodes_path, _EPISODES_CSV_COLUMNS, episode_records)
 
 
 def _seed_torch_for_episode(seed, ep_idx):
@@ -242,6 +279,18 @@ def main():
                         help="open on-screen viewer to watch rollouts live")
     parser.add_argument("--seed", type=int, default=42,
                         help="torch RNG seed for deterministic policy sampling (default: 42)")
+
+    # Stats recording
+    stats = parser.add_argument_group("stats recording")
+    stats.add_argument("--stats_dir", type=str,
+                       default=os.path.join(_SCENE_DIR, "custom"),
+                       help="directory to write stats_runs.csv / stats_episodes.csv "
+                            "(default: scene/custom)")
+    stats.add_argument("--no_stats", action="store_true",
+                       help="do not write CSV stats rows for this evaluation")
+    stats.add_argument("--run_id", type=str, default=None,
+                       help="explicit run_id to use in the stats CSVs "
+                            "(default: auto-generated)")
     args = parser.parse_args()
 
     # Load dataset
@@ -306,6 +355,48 @@ def main():
         print(f"  Crashed:      {results['num_crashed']}/{n_eval}")
     print(f"  Avg return:   {results['avg_return']:.3f}")
     print(f"  Avg horizon:  {results['avg_horizon']:.1f}")
+
+    # Write stats CSVs
+    if not args.no_stats:
+        run_id = args.run_id or uuid.uuid4().hex[:12]
+        successes = [int(s > 0) for s in merged["Success_Rate"]]
+        crashes = [int(c > 0) for c in merged["Crashed"]]
+        run_record = {
+            "run_id": run_id,
+            "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+            "agent": args.agent,
+            "dataset": args.dataset,
+            "scene_name": config.name,
+            "arg_n": args.n if args.n is not None else "",
+            "arg_range": args.index_range if args.index_range is not None else "",
+            "arg_random": int(bool(args.random)),
+            "selection_seed": args.selection_seed,
+            "seed": args.seed,
+            "horizon": args.horizon,
+            "n_total": n_total,
+            "n_evaluated": n_eval,
+            "indices": json.dumps(indices),
+            "successes": json.dumps(successes),
+            "num_success": results["num_success"],
+            "num_crashed": results["num_crashed"],
+            "success_rate": results["success_rate"],
+            "avg_return": results["avg_return"],
+            "avg_horizon": results["avg_horizon"],
+        }
+        episode_records = [
+            {
+                "run_id": run_id,
+                "episode_idx": ep_idx,
+                "success": successes[i],
+                "crashed": crashes[i],
+                "return": float(merged["Return"][i]),
+                "horizon": int(merged["Horizon"][i]),
+            }
+            for i, ep_idx in enumerate(indices)
+        ]
+        write_stats(args.stats_dir, run_record, episode_records)
+        print(f"  Stats:        {args.stats_dir}/stats_runs.csv "
+              f"(run_id={run_id})")
 
 
 if __name__ == "__main__":

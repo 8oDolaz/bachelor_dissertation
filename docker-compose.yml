@@ -21,6 +21,6 @@ services:
               capabilities: [gpu]
     ports:
       - "6007:6007"
-    shm_size: '8g'
+    shm_size: '16g'
     stdin_open: true
     tty: true

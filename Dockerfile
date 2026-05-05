@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
         libglfw3-dev libglew-dev libosmesa6-dev \
         libx11-6 libxcursor1 libxrandr2 libxinerama1 libxi6 \
+        libsm6 libxext6 libxrender1 \
         libglib2.0-0 \
         patchelf \
     && rm -rf /var/lib/apt/lists/*

@@ -187,7 +187,9 @@ def set_hyperparameters(config):
     return config
 
 
-def get_config(dataset_path=None, output_dir=None, debug=False):
+def get_config(dataset_path=None, output_dir=None, debug=False,
+               exp_name=None, rollout_rate=None, rollout_n=None,
+               train_filter_key=None, valid_filter_key=None):
     """
     Construct config for training.
 
@@ -195,6 +197,11 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
         dataset_path (str or None): path to hdf5 dataset.
         output_dir (str): path to output folder.
         debug (bool): if True, shrink training for a quick test run.
+        exp_name (str or None): overrides experiment.name (output subfolder).
+        rollout_rate (int or None): overrides experiment.rollout.rate.
+        rollout_n (int or None): overrides experiment.rollout.n.
+        train_filter_key (str or None): overrides train.hdf5_filter_key.
+        valid_filter_key (str or None): overrides train.hdf5_validation_filter_key.
     """
     if dataset_path is None:
         dataset_path = TestUtils.example_dataset_path()
@@ -225,6 +232,18 @@ def get_config(dataset_path=None, output_dir=None, debug=False):
         config.experiment.rollout.n = 2
         config.experiment.rollout.horizon = 10
 
+    # User overrides (applied last so they also win over debug defaults).
+    if exp_name is not None:
+        config.experiment.name = exp_name
+    if rollout_rate is not None:
+        config.experiment.rollout.rate = int(rollout_rate)
+    if rollout_n is not None:
+        config.experiment.rollout.n = int(rollout_n)
+    if train_filter_key is not None:
+        config.train.hdf5_filter_key = train_filter_key
+    if valid_filter_key is not None:
+        config.train.hdf5_validation_filter_key = valid_filter_key
+
     return config
 
 
@@ -251,6 +270,17 @@ if __name__ == "__main__":
         help="run a quick training run for debugging",
     )
 
+    parser.add_argument("--exp_name", type=str, default=None,
+                        help="override experiment.name (output subfolder)")
+    parser.add_argument("--rollout_rate", type=int, default=None,
+                        help="epochs between rollout evaluations")
+    parser.add_argument("--rollout_n", type=int, default=None,
+                        help="number of episodes per rollout evaluation")
+    parser.add_argument("--train_filter_key", type=str, default=None,
+                        help="HDF5 mask key for the training split")
+    parser.add_argument("--valid_filter_key", type=str, default=None,
+                        help="HDF5 mask key for the validation split")
+
     args = parser.parse_args()
 
     if args.debug:
@@ -260,6 +290,11 @@ if __name__ == "__main__":
         dataset_path=args.dataset,
         output_dir=os.path.abspath(args.output) if args.output is not None else None,
         debug=args.debug,
+        exp_name=args.exp_name,
+        rollout_rate=args.rollout_rate,
+        rollout_n=args.rollout_n,
+        train_filter_key=args.train_filter_key,
+        valid_filter_key=args.valid_filter_key,
     )
 
     device = TorchUtils.get_torch_device(try_to_use_cuda=config.train.cuda)

@@ -1,0 +1,60 @@
+# Example sweep for utils/train_models.py
+#
+# Each job produces one training run under:
+#   train_runs/{model}_{codebook|none}_{pct}pct_r{rollout_rate}/<timestamp>/
+#
+# Run:
+#   python utils/train_models.py --config utils/config_training.yaml --dry_run
+#   python utils/train_models.py --config utils/config_training.yaml
+
+defaults:
+  dataset: dataset/lift/ph/image.hdf5   # adjust to your dataset
+  rollout_rate: 10                           # epochs between rollouts
+  rollout_n: 10                              # episodes per rollout
+  dataset_percent: 100                       # % of demos used for train+valid
+  timeout_sec: null                          # null = no per-job timeout
+  retries: 0
+  val_ratio: 0.1                             # used only when dataset_percent < 100
+  subset_seed: 42                            # fixed so the same % is always the same demos
+
+jobs:
+  # - model: dino_transformer
+
+  # - model: dino_transformer
+  #   dataset_percent: 75
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 1024
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 1024
+  #   dataset_percent: 75
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 512
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 512
+  #   dataset_percent: 75
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 256
+
+  # - model: dino_vqvae_transformer
+  #   codebook_size: 256
+  #   dataset_percent: 75
+
+  - model: dino_transformer
+    dataset_percent: 50
+
+  - model: dino_vqvae_transformer
+    codebook_size: 1024
+    dataset_percent: 50
+
+  - model: dino_vqvae_transformer
+    codebook_size: 512
+    dataset_percent: 50
+
+  - model: dino_vqvae_transformer
+    codebook_size: 256
+    dataset_percent: 50

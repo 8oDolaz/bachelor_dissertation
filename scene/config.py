@@ -9,7 +9,7 @@ Each config controls one axis of domain randomization:
   - SceneConfig: combines all of the above
 """
 from dataclasses import dataclass, field
-from typing import Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List
 
 
 @dataclass
@@ -29,6 +29,10 @@ class TextureConfig:
     randomize_skybox: bool = False
     # Restrict to specific geoms (None = all)
     geom_names: Optional[List[str]] = None
+    # Map of geom_name -> image path. When set, the geom's existing texture
+    # bitmap is replaced with the supplied image (resized to fit).
+    # Applied independently of `enabled` (works with or without color jitter).
+    image_textures: Optional[Dict[str, str]] = None
 
 
 @dataclass

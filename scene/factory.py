@@ -5,12 +5,17 @@ visual domain randomization (textures, lighting, camera, object placement).
 The environments are fully compatible with robomimic's rollout infrastructure
 so trained checkpoints can be evaluated directly.
 """
+import os
 from copy import deepcopy
 
 import numpy as np
 import robosuite as suite
 import robosuite.macros as macros
 from robosuite.utils.mjmod import LightingModder, CameraModder
+
+# Directory containing user-provided texture images (e.g. table.jpg).
+_SCENE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(_SCENE_DIR, "assets")
 
 # Training data was collected with opencv convention (images flipped to standard
 # top-left origin). Must match here so the policy sees identical orientations.
@@ -209,6 +214,97 @@ class GeomColorModder:
 
 
 # ---------------------------------------------------------------------------
+# ImageTextureModder: replaces a geom's existing material texture with a
+# user-provided image, resized to the original texture dimensions.
+#
+# Works with mujoco 3.x (uses model.tex_data, falls back to tex_rgb on
+# older versions). Re-uploads the texture to the GPU after writing so the
+# next render call picks it up.
+# ---------------------------------------------------------------------------
+class ImageTextureModder:
+    """
+    Map of {geom_name: image_path}. On reset, each image is loaded,
+    resized to the existing texture's dimensions and written into the
+    MuJoCo texture buffer. Idempotent: calling randomize() multiple
+    times re-applies the same image.
+    """
+
+    def __init__(self, sim, image_paths):
+        self.sim = sim
+        self.image_paths = dict(image_paths)
+        # geom_name -> (tex_id, tex_adr, byte_size, bitmap_uint8)
+        self._entries = {}
+        self._load_images()
+
+    def _resolve_texture_id(self, model, geom_name):
+        gid = model.geom_name2id(geom_name)
+        mid = int(model.geom_matid[gid])
+        if mid < 0:
+            raise ValueError(
+                f"Geom {geom_name!r} has no material assigned; cannot set image texture."
+            )
+        texid = model.mat_texid[mid]
+        # mujoco 3.x stores texture ids per role (e.g. RGB, occlusion, ...)
+        if hasattr(texid, "__len__"):
+            valid = [int(t) for t in texid if int(t) >= 0]
+            if not valid:
+                raise ValueError(
+                    f"Material for geom {geom_name!r} has no texture in any role."
+                )
+            return valid[0]
+        tid = int(texid)
+        if tid < 0:
+            raise ValueError(
+                f"Material for geom {geom_name!r} has no texture assigned."
+            )
+        return tid
+
+    def _load_images(self):
+        import cv2
+
+        model = self.sim.model
+        self._entries.clear()
+        for geom_name, path in self.image_paths.items():
+            tid = self._resolve_texture_id(model, geom_name)
+            h = int(model.tex_height[tid])
+            w = int(model.tex_width[tid])
+            adr = int(model.tex_adr[tid])
+            nchannel = (
+                int(model.tex_nchannel[tid])
+                if hasattr(model, "tex_nchannel") else 3
+            )
+
+            img = cv2.imread(path, cv2.IMREAD_COLOR)
+            if img is None:
+                raise FileNotFoundError(f"Could not load texture image: {path}")
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
+            if nchannel == 4:
+                alpha = np.full((h, w, 1), 255, dtype=np.uint8)
+                img = np.concatenate([img, alpha], axis=2)
+            bitmap = np.ascontiguousarray(img, dtype=np.uint8)
+            size = h * w * nchannel
+            self._entries[geom_name] = (tid, adr, size, bitmap)
+
+    def update_sim(self, sim):
+        self.sim = sim
+        self._load_images()
+
+    def save_defaults(self):
+        # No restore: image textures are intentionally permanent for the run.
+        pass
+
+    def randomize(self):
+        model = self.sim.model
+        tex_buf = model.tex_data if hasattr(model, "tex_data") else model.tex_rgb
+        ctx = getattr(self.sim, "_render_context_offscreen", None)
+        for tid, adr, size, bitmap in self._entries.values():
+            tex_buf[adr:adr + size] = bitmap.flatten()
+            if ctx is not None:
+                ctx.upload_texture(tid)
+
+
+# ---------------------------------------------------------------------------
 # Environment kwargs matching the training dataset (Lift / Panda / OSC_POSE)
 # ---------------------------------------------------------------------------
 _BASE_ENV_KWARGS = dict(
@@ -383,6 +479,13 @@ class ModifiedLiftEnv:
             )
             self._modders.append(self._color_modder)
 
+        if cfg.texture.image_textures:
+            self._image_texture_modder = ImageTextureModder(
+                sim=self.env.sim,
+                image_paths=cfg.texture.image_textures,
+            )
+            self._modders.append(self._image_texture_modder)
+
         self._modders_initialized = True
 
     def _apply_randomization(self):
@@ -530,6 +633,15 @@ PRESETS = {
             texture_variations=("rgb",),
             geom_names=["table_visual", "cube_g0_vis"],
         ),
+    ),
+    "image_texture_table": SceneConfig(
+        name="image_texture_table",
+        texture=TextureConfig(
+            image_textures={
+                "table_visual": os.path.join(ASSETS_DIR, "table.jpg"),
+            },
+        ),
+        placement=PlacementConfig(enabled=True),
     ),
     "lighting_change": SceneConfig(
         name="lighting_change",

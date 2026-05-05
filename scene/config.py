@@ -46,6 +46,10 @@ class LightingConfig:
     specular_perturbation_size: float = 0.1
     ambient_perturbation_size: float = 0.1
     diffuse_perturbation_size: float = 0.1
+    # Brightness: uniform scale of diffuse+ambient (all RGB channels equally)
+    brightness_perturbation_size: float = 0.0
+    # Warmth: correlated warm/cool shift (+R+G-B for warm, -R-G+B for cool)
+    warmth_perturbation_size: float = 0.0
 
 
 @dataclass

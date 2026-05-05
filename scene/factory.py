@@ -22,6 +22,100 @@ from config import (
 
 
 # ---------------------------------------------------------------------------
+# SceneLightModder: physically plausible lighting using direct model access.
+#
+# The arena's default light has castshadow=False and directional=True, so
+# position changes produce no shadow movement and look like color changes.
+# This modder reconfigures the light at runtime to be a shadow-casting
+# positional light, then randomizes position, brightness, and warmth.
+# ---------------------------------------------------------------------------
+class SceneLightModder:
+    """
+    Reconfigures scene light index 0 to cast shadows and be positional,
+    then randomizes:
+      - position: moves the light source so shadows visibly shift
+      - brightness: uniform scale across all RGB channels (dim <-> bright)
+      - warmth: correlated warm/cool shift (+R+G-B for warm, -R-G+B for cool)
+    """
+
+    _WARMTH_AXIS   = np.array([1.0, 0.4, -1.0])
+    _BASE_POS      = np.array([0.5,  0.5,  2.5])
+    _BASE_DIR      = np.array([-0.5, -0.5, -1.0])
+    _BASE_DIFFUSE  = np.array([0.8,  0.8,  0.8])
+    _BASE_AMBIENT  = np.array([0.15, 0.15, 0.15])
+    _BASE_SPECULAR = np.array([0.4,  0.4,  0.4])
+
+    def __init__(self, sim, random_state,
+                 position_perturbation_size=0.5,
+                 brightness_perturbation_size=0.2,
+                 warmth_perturbation_size=0.15,
+                 light_idx=0):
+        self.sim = sim
+        self.random_state = random_state
+        self.position_perturbation_size = position_perturbation_size
+        self.brightness_perturbation_size = brightness_perturbation_size
+        self.warmth_perturbation_size = warmth_perturbation_size
+        self.light_idx = light_idx
+        self._configure_light()
+        self.save_defaults()
+
+    def _configure_light(self):
+        """Enable shadows, make the light positional, set a sensible baseline."""
+        m = self.sim.model
+        i = self.light_idx
+        m.light_castshadow[i] = 1
+        # Make light positional so shadows shift with its position.
+        # light_type (newer MuJoCo): 0=SPOT, 1=DIRECTIONAL, 2=POINT
+        # light_directional (older MuJoCo): bool, 0=positional spot
+        # light_mode is unrelated (body-tracking mode) — do NOT touch it.
+        if hasattr(m, 'light_type'):
+            m.light_type[i] = 0       # mjLIGHT_SPOT
+        elif hasattr(m, 'light_directional'):
+            m.light_directional[i] = 0
+        if hasattr(m, 'light_cutoff'):
+            m.light_cutoff[i] = 90.0  # wide cone — covers full scene from above
+        m.light_dir[i] = [0.0, 0.0, -1.0]  # point straight down
+        m.light_pos[i] = self._BASE_POS.copy()
+        m.light_diffuse[i] = self._BASE_DIFFUSE.copy()
+        m.light_ambient[i] = self._BASE_AMBIENT.copy()
+        m.light_specular[i] = self._BASE_SPECULAR.copy()
+
+    def save_defaults(self):
+        m = self.sim.model
+        i = self.light_idx
+        self._def_pos     = m.light_pos[i].copy()
+        self._def_diffuse = m.light_diffuse[i].copy()
+        self._def_ambient = m.light_ambient[i].copy()
+
+    def update_sim(self, sim):
+        self.sim = sim
+        self._configure_light()
+        self.save_defaults()
+
+    def randomize(self):
+        rs = self.random_state
+        m  = self.sim.model
+        i  = self.light_idx
+
+        # Move the light to a new position so shadows visibly shift
+        p = self.position_perturbation_size
+        new_pos = self._def_pos + rs.uniform(-p, p, size=3)
+        new_pos[2] = np.clip(new_pos[2], 1.5, 3.5)  # keep above scene
+        m.light_pos[i] = new_pos
+
+        # Brightness: uniform shift across all RGB channels
+        brightness = rs.uniform(-self.brightness_perturbation_size,
+                                self.brightness_perturbation_size)
+        # Warmth: correlated warm/cool color temperature shift
+        warmth = rs.uniform(-self.warmth_perturbation_size,
+                            self.warmth_perturbation_size)
+
+        color_delta = brightness + warmth * self._WARMTH_AXIS
+        m.light_diffuse[i] = np.clip(self._def_diffuse + color_delta, 0.0, 1.0)
+        m.light_ambient[i] = np.clip(self._def_ambient + color_delta * 0.4, 0.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
 # GeomColorModder: mujoco 3.5-compatible color/material randomization
 # (robosuite's TextureModder relies on model.tex_rgb which was removed)
 # ---------------------------------------------------------------------------
@@ -233,21 +327,33 @@ class ModifiedLiftEnv:
 
         if cfg.lighting.enabled:
             lc = cfg.lighting
-            self._light_modder = LightingModder(
-                sim=self.env.sim,
-                random_state=rs,
-                randomize_position=lc.randomize_position,
-                randomize_direction=lc.randomize_direction,
-                randomize_specular=lc.randomize_specular,
-                randomize_ambient=lc.randomize_ambient,
-                randomize_diffuse=lc.randomize_diffuse,
-                randomize_active=lc.randomize_active,
-                position_perturbation_size=lc.position_perturbation_size,
-                direction_perturbation_size=lc.direction_perturbation_size,
-                specular_perturbation_size=lc.specular_perturbation_size,
-                ambient_perturbation_size=lc.ambient_perturbation_size,
-                diffuse_perturbation_size=lc.diffuse_perturbation_size,
-            )
+            if lc.brightness_perturbation_size > 0 or lc.warmth_perturbation_size > 0:
+                # Use SceneLightModder: reconfigures the scene light to cast
+                # shadows and be positional, then randomizes position/brightness/warmth.
+                self._light_modder = SceneLightModder(
+                    sim=self.env.sim,
+                    random_state=rs,
+                    position_perturbation_size=lc.position_perturbation_size,
+                    brightness_perturbation_size=lc.brightness_perturbation_size,
+                    warmth_perturbation_size=lc.warmth_perturbation_size,
+                )
+            else:
+                # Fallback: standard robosuite LightingModder (no shadows)
+                self._light_modder = LightingModder(
+                    sim=self.env.sim,
+                    random_state=rs,
+                    randomize_position=lc.randomize_position,
+                    randomize_direction=lc.randomize_direction,
+                    randomize_specular=lc.randomize_specular,
+                    randomize_ambient=lc.randomize_ambient,
+                    randomize_diffuse=lc.randomize_diffuse,
+                    randomize_active=lc.randomize_active,
+                    position_perturbation_size=lc.position_perturbation_size,
+                    direction_perturbation_size=lc.direction_perturbation_size,
+                    specular_perturbation_size=lc.specular_perturbation_size,
+                    ambient_perturbation_size=lc.ambient_perturbation_size,
+                    diffuse_perturbation_size=lc.diffuse_perturbation_size,
+                )
             self._modders.append(self._light_modder)
 
         if cfg.camera.enabled:
@@ -429,11 +535,9 @@ PRESETS = {
         name="lighting_change",
         lighting=LightingConfig(
             enabled=True,
-            position_perturbation_size=0.3,
-            direction_perturbation_size=0.5,
-            specular_perturbation_size=0.2,
-            ambient_perturbation_size=0.15,
-            diffuse_perturbation_size=0.15,
+            position_perturbation_size=1,
+            brightness_perturbation_size=1,
+            warmth_perturbation_size=1,
         ),
         placement=PlacementConfig(enabled=True),
     ),

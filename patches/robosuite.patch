@@ -1,3 +1,17 @@
+diff --git a/robosuite/models/assets/grippers/panda_gripper.xml b/robosuite/models/assets/grippers/panda_gripper.xml
+index fb94634..8ad8113 100644
+--- a/robosuite/models/assets/grippers/panda_gripper.xml
++++ b/robosuite/models/assets/grippers/panda_gripper.xml
+@@ -22,8 +22,7 @@
+                 <site name="ee_x" pos="0.1 0 0" size="0.005 .1"  quat="0.707105  0 0.707108 0 " rgba="1 0 0 0" type="cylinder" group="1"/>
+                 <site name="ee_y" pos="0 0.1 0" size="0.005 .1" quat="0.707105 0.707108 0 0" rgba="0 1 0 0" type="cylinder" group="1"/>
+                 <site name="ee_z" pos="0 0 0.1" size="0.005 .1" quat="1 0 0 0" rgba="0 0 1 0" type="cylinder" group="1"/>
+-                <!-- This site was added for visualization. -->
+-                <site name="grip_site_cylinder" pos="0 0 0" size="0.005 10" rgba="0 1 0 0.3" type="cylinder" group="1"/>
++                <site name="grip_site_cylinder" pos="0 0 0" size="1e-6 1e-6" rgba="0 0 0 0" type="cylinder" group="1"/>
+             </body>
+             <body name="leftfinger" pos="0 0 0.0524" quat="0.707107 0 0 0.707107">
+                 <inertial pos="0 0 0.05" mass="0.1" diaginertia="0.01 0.01 0.005" />
 diff --git a/robosuite/renderers/context/egl_context.py b/robosuite/renderers/context/egl_context.py
 index 72c187f..2a476a2 100644
 --- a/robosuite/renderers/context/egl_context.py
